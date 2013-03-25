@@ -34,6 +34,8 @@
 #define SAFE_ARM_SLEEP_VOLT_PATCH
 #define SAFE_ARM_SLEEP_VOLTAGE   (1100000)  //jeff, for wakeup failure issue, make sure ARM @1GHZ, VDD_ARM >= 1.1V
 
+static int cpu_under_voltage=1;
+
 static struct exynos_dvfs_info *exynos_info;
 
 static struct regulator *arm_regulator;
@@ -735,13 +737,36 @@ late_initcall(exynos_cpufreq_init);
 /* sysfs interface for UV control */
 ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf) {
 	int i, len = 0;
+	if(cpu_under_voltage)
+	{
+		cpu_under_voltage = 0;
+		for (i = exynos_info->max_support_idx; i<=exynos_info->min_support_idx; i++)
+		{
+
+			if(exynos_info->freq_table[i].frequency==CPUFREQ_ENTRY_INVALID) continue;
+			
+			exynos_info->volt_table[i] -= 50000;
+
+			if(exynos_info->volt_table[i] % 12500)
+				exynos_info->volt_table[i] = (exynos_info->volt_table[i] / 12500) * 12500;
+
+			if (exynos_info->volt_table[i] > CPU_UV_MV_MAX) {
+				exynos_info->volt_table[i] = CPU_UV_MV_MAX;
+			}
+			else if (exynos_info->volt_table[i] < CPU_UV_MV_MIN) {
+				exynos_info->volt_table[i] = CPU_UV_MV_MIN;
+			}
+		}
+	}
+	
 	if (buf)
 	{
 		for (i = exynos_info->max_support_idx; i<=exynos_info->min_support_idx; i++)
 		{
+
 			if(exynos_info->freq_table[i].frequency==CPUFREQ_ENTRY_INVALID) continue;
 			len += sprintf(buf + len, "%dmhz: %d mV\n", exynos_info->freq_table[i].frequency/1000, 
-					((exynos_info->volt_table[i] % 1000) + exynos_info->volt_table[i])/1000);
+					exynos_info->volt_table[i]/1000);
 		}
 	}
 	return len;
@@ -753,13 +778,14 @@ ssize_t store_UV_mV_table(struct cpufreq_policy *policy, const char *buf, size_t
 	unsigned int ret = -EINVAL;
 	int i = 0;
 	int j = 0;
-	int u[5];
-	ret = sscanf(buf, "%d %d %d %d %d", &u[0], &u[1], &u[2], &u[3], &u[4]); 
+	int u[13];
+	ret = sscanf(buf, "%d %d %d %d %d %d %d %d %d %d %d %d %d", 
+			&u[0], &u[1], &u[2], &u[3], &u[4], &u[5], &u[6], &u[7], &u[8], &u[9], &u[10], &u[11], &u[12]); 
 
-	if( ret != 5)
+	if( ret != 13)
 		return -EINVAL;
 
-	for( i = 0; i < 5; i++ )
+	for( i = 0; i < 13; i++ )
 	{
 		u[i] *= 1000;
 		
@@ -774,7 +800,7 @@ ssize_t store_UV_mV_table(struct cpufreq_policy *policy, const char *buf, size_t
 		}
 	}
 
-	for( i = 0; i < 5; i++ ) {
+	for( i = 0; i < 13; i++ ) {
 		while(exynos_info->freq_table[i+j].frequency==CPUFREQ_ENTRY_INVALID)
 			j++;
 		exynos_info->volt_table[i+j] = u[i];
