@@ -1165,7 +1165,7 @@ static void ft5x0x_report_value(void)
 			msecs_to_jiffies(TOUCH_BOOSTER_TIME));
 
 		if (!dvfs_lock_status && press_status) {
-			ret = exynos_cpufreq_lock(DVFS_LOCK_ID_TSP, L8);
+			ret = exynos_cpufreq_lock(DVFS_LOCK_ID_TSP, L14);
 			if (ret < 0) {
 				pr_err("%s: cpufreq lock failed(%d)\n",
 					__func__, __LINE__);
